@@ -1,0 +1,87 @@
+[CmdletBinding()]
+param()
+
+# Enforce stricter error handling:
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# Path to the log file:
+$LOG_FILE = "C:\docker_setup.log"
+
+function Log($Message) {
+    $TimeStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path $LOG_FILE -Value "$TimeStamp - $Message"
+}
+
+function ErrorExit($Message) {
+    Write-Host "[-] ERROR: $Message"
+    Log "ERROR: $Message"
+    exit 1
+}
+
+function main {
+
+    Write-Host "[!] Starting Docker installation script..."
+    Log "[+] Starting Docker installation script."
+
+    # 1. Check if running as Administrator:
+    if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
+        [Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        ErrorExit "Please run this script as an Administrator."
+    }
+
+    # 2. Ensure 'containers' Windows feature is enabled:
+    Write-Host "[!] Enabling 'containers' Windows feature..."
+    Log "Enabling 'containers' Windows feature..."
+    try {
+        Enable-WindowsOptionalFeature -Online -FeatureName containers -NoRestart
+        Write-Host "[+] 'containers' feature enabled successfully."
+    } catch {
+        ErrorExit "Failed to enable 'containers' feature. $_"
+    }
+
+    # 3. Install the DockerMsftProvider module from the PowerShell Gallery:
+    Write-Host "[!] Installing DockerMsftProvider..."
+    Log "Installing DockerMsftProvider..."
+    try {
+        Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
+        Write-Host "[+] DockerMsftProvider installed successfully."
+    } catch {
+        ErrorExit "Failed to install DockerMsftProvider. $_"
+    }
+
+    # 4. Install Docker using the DockerMsftProvider:
+    Write-Host "[!] Installing Docker via DockerMsftProvider..."
+    Log "Installing Docker..."
+    try {
+        Install-Package -Name Docker -ProviderName DockerMsftProvider -Force
+        Write-Host "[+] Docker package installed successfully."
+    } catch {
+        ErrorExit "Failed to install Docker. $_"
+    }
+
+    # 5. Start and configure Docker service:
+    Write-Host "[!] Starting Docker service..."
+    Log "Starting Docker service..."
+    try {
+        Start-Service Docker
+        Set-Service Docker -StartupType Automatic
+        Write-Host "[+] Docker service started and set to start automatically."
+    } catch {
+        ErrorExit "Failed to start or configure Docker service. $_"
+    }
+
+    # 6. Final output:
+    Write-Host "[+] Docker installation completed successfully!"
+    Log "[+] Docker installation completed successfully."
+}
+
+function runMain {
+    Write-Host "[!] Starting the Docker setup script."
+    Log "Starting the Docker setup script."
+    main
+    Write-Host "[+] Docker setup script finished successfully."
+    Log "Docker setup script finished."
+}
+
+runMain
